@@ -18,7 +18,6 @@ class BallSegmentation():
         assert self.imgList != [], "Empty Folder! No images were found!"
 
         self.imgAnnotations()
-        pdb.set_trace()
 
     def imgAnnotations(self):
         """Save the annotated mask in the given path.
@@ -63,8 +62,7 @@ class BallSegmentation():
 
         img = cv.addWeighted(img2, 0.6, imgSegment, 0.4, 0)
 
-        # cv.imshow("Image", img2)
-        # cv.imshow("Mask", imgSegment)
+        cv.imshow("image", imgSubtract)
         keyboard = cv.waitKey(0)
 
         return imgSegment
@@ -74,7 +72,7 @@ class LiveExperiment():
         self.algo = algo
         self.savePath = savePath
 
-    def drawCircleLive(self):
+    def drawMaskLive(self):
         capture = cv.VideoCapture(0)
         ret, frame_0 = capture.read()
         i = 0
@@ -84,10 +82,10 @@ class LiveExperiment():
             if frame_1 is None:
                 break
 
-            imgMask = self.drawCircle(frame_0, frame_1)
+            imgMask = self.drawMask(frame_0, frame_1)
             cv.imshow('Mask', imgMask)
 
-            cv.imwrite(self.savePath + f"{i}.jpg", imgMask)
+            # cv.imwrite(self.savePath + f"{i}.jpg", imgMask)
 
             frame_0 = frame_1 
             i += 1           
@@ -96,13 +94,15 @@ class LiveExperiment():
             if keyboard == 'q' or keyboard == 27:
                 break
 
-    def drawCircle(self, img1, img2): 
-        # Load images     
+    def drawMask(self, img1, img2):
+        """Returns the mask with ball segmentation.
+        img1 : image at time t-1
+        img2: image at time t (real-time)
+        """ 
         img1 = cv.cvtColor(img1, cv.COLOR_BGR2GRAY)
         img2 = cv.cvtColor(img2, cv.COLOR_BGR2GRAY)
         imgBlack = np.zeros((img1.shape[0], img1.shape[1]), dtype=np.uint8)
 
-        # Find contours
         imgSubtract = cv.subtract(img2, img1)
         imgSubtract = cv.bilateralFilter(imgSubtract, 5, 5, 5)
         imgSubtract = cv.fastNlMeansDenoising(imgSubtract, None, 10, 5, 5)
@@ -112,7 +112,6 @@ class LiveExperiment():
         if cnt == []:
             return img2
         else:
-            # List of contour-coordinates
             cntX, cntY = list(), list()
             cnt = np.concatenate(cnt).ravel().tolist()
             for i in range(len(cnt)):
@@ -123,12 +122,10 @@ class LiveExperiment():
             xMax, xMin = np.max(cntX), np.min(cntX)
             yMax, yMin = np.max(cntY), np.min(cntY)
 
-            # Radius of each coordinate
             radiusX = int((xMax - xMin) / 2)
             radiusY = int((yMax - yMin) / 2)
             radius = np.max((radiusX, radiusY))
             
-            # Draw Circle
             centreCoordX = xMin + radius
             centreCoordY = yMin + radius
             centreCoord = (centreCoordX, centreCoordY)
@@ -136,12 +133,13 @@ class LiveExperiment():
             color = 255
             imgSegment = cv.circle(imgBlack, centreCoord, radius, color, -1)
 
-            # Weighted sum of images (create mask)
             img = cv.addWeighted(img2, 0.6, imgSegment, 0.4, 0)
 
             return img
 
     def videoBackgroundSubt(self):
+        """Runs subtraction between sequential frames coming from webcam.
+        """
         if self.algo == 'MOG2':
             backSub = cv.createBackgroundSubtractorMOG2(history=2, varThreshold=50, detectShadows=False)
         else:
@@ -176,8 +174,8 @@ if __name__ == '__main__':
     parser.add_argument('--savePath', type=str, help='Path to folder where images are saved', default='C:/Users/thiag/Desktop/InLevel/Football/AutoLabelling/masks/')
     args = parser.parse_args()
 
-    # s = BallSegmentation(args.imgPath, args.savePath)
-    # s.drawCircle(1)
+    s = BallSegmentation(args.imgPath, args.savePath)
+    s.drawCircle(1)
 
-    s = LiveExperiment(args.algo, args.savePath)
-    s = s.drawCircleLive()
+    # s = LiveExperiment(args.algo, args.savePath)
+    # s = s.drawMaskLive()
